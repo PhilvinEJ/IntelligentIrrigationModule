@@ -1,134 +1,111 @@
-git clone https://github.com/adafruit/Adafruit_Python_DHT.git
-cd Adafruit_Python_DHT
-sudo apt-get upgrade  
-sudo apt-get install build-essential python-dev
-sudo python setup.py install
-cd examples
-sudo ./AdafruitDHT.py 2302 4
-sudo apt install python-gpiozero
-humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
-	import sys
-import Adafruit_DHT
-from gpiozero import LED, Button
-from time import sleep
-import pubnub
-from pubnub.pnconfiguration import PNConfiguration
-from pubnub.pubnub import PubNub
-from pubnub.callbacks import SubscribeCallback
-from pubnub.enums import PNOperationType, PNStatusCategory
- 
-pnconfig = PNConfiguration()
-pnconfig.subscribe_key = "sub-c-a667485c-757f-11e8-9f59-fec9626a7085"
-pnconfig.publish_key = "pub-c-cb2e18e3-a8b0-486a-bf82-2d9e9f670b7e"
-pnconfig.ssl = False
- 
-pubnub = PubNub(pnconfig)
-#Pump is connected to GPIO4 as an LED
-pump = LED(4)
-#DHT Sensor is connected to GPIO17
-sensor = 22
-pin = 17
-#Soil Moisture sensor is connected to GPIO14 as a button
-soil = Button(14)
-flag = 1
-pump.on()
-class MySubscribeCallback(SubscribeCallback):
-    def status(self, pubnub, status):
-        pass
-        # The status object returned is always related to subscribe but could contain
-        # information about subscribe, heartbeat, or errors
-        # use the operationType to switch on different options
-        if status.operation == PNOperationType.PNSubscribeOperation \
-                or status.operation == PNOperationType.PNUnsubscribeOperation:
-            if status.category == PNStatusCategory.PNConnectedCategory:
-                pass
-                # This is expected for a subscribe, this means there is no error or issue whatsoever
-            elif status.category == PNStatusCategory.PNReconnectedCategory:
-                pass
-                # This usually occurs if subscribe temporarily fails but reconnects. This means
-                # there was an error but there is no longer any issue
-            elif status.category == PNStatusCategory.PNDisconnectedCategory:
-                pass
-                # This is the expected category for an unsubscribe. This means there
-                # was no error in unsubscribing from everything
-            elif status.category == PNStatusCategory.PNUnexpectedDisconnectCategory:
-                pass
-                # This is usually an issue with the internet connection, this is an error, handle
-                # appropriately retry will be called automatically
-            elif status.category == PNStatusCategory.PNAccessDeniedCategory:
-                pass
-                # This means that PAM does allow this client to subscribe to this
-                # channel and channel group configuration. This is another explicit error
-            else:
-                pass
-                # This is usually an issue with the internet connection, this is an error, handle appropriately
-                # retry will be called automatically
-        elif status.operation == PNOperationType.PNSubscribeOperation:
-            # Heartbeat operations can in fact have errors, so it is important to check first for an error.
-            # For more information on how to configure heartbeat notifications through the status
-            # PNObjectEventListener callback, consult <link to the PNCONFIGURATION heartbeart config>
-            if status.is_error():
-                pass
-                # There was an error with the heartbeat operation, handle here
-            else:
-                pass
-                # Heartbeat operation was successful
-        else:
-            pass
-            # Encountered unknown status type
- 
-    def presence(self, pubnub, presence):
-        pass  # handle incoming presence data
- 
-    def message(self, pubnub, message):
-        if message.message == 'ON':
-        	global flag
-        	flag = 1
-        elif message.message == 'OFF':
-			global flag
-			flag = 0
-        elif message.message == 'WATER':
-        	pump.off()
-        	sleep(5)
-        	pump.on()
- 
- 
-pubnub.add_listener(MySubscribeCallback())
-pubnub.subscribe().channels('ch1').execute()
-def publish_callback(result, status):
-	pass
-def get_status():
-	if soil.is_held:
-		print("dry")
-		return True
-	else:
-		print("wet")
-		return False
-while True:
-	if flag ==1:
-		# Try to grab a sensor reading.  Use the read_retry method which will retry up
-		# to 15 times to get a sensor reading (waiting 2 seconds between each retry).
-		humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
-		DHT_Read = ('Temp={0:0.1f}*  Humidity={1:0.1f}%'.format(temperature, humidity))
-		print(DHT_Read)
+<!DOCTYPE html>
+<html>
+	<body>
 
-		dictionary = {"eon": {"Temperature": temperature, "Humidity": humidity}}
-		pubnub.publish().channel('ch2').message([DHT_Read]).async(publish_callback)
-		pubnub.publish().channel("eon-chart").message([dictionary]).async(publish_callback)
-		pubnub.publish().channel("eon-chart").message(dictionary).async(publish_callback)
+		<h1>IoT Plant</h1>
 
-		wet = get_status()
 
-		if wet == True:
-		    print("turning on")
-		    pump.off()
-		    sleep(5)
-		    print("pump turning off")
-		    pump.on()
-		    sleep(1)
-		else:
-		    pump.on()
-		sleep(1)
-	elif flag == 0:
-		pump.on()
-		sleep(3)
+		<button type="button" onclick="publish('ON')">Auto Mode ON</button>
+		<button type="button" onclick="publish('OFF')">Auto Mode OFF</button>
+		<button type="button" onclick="publish('WATER')">Water Plant</button>
+
+		<p id="sensorData">Temperature and Humidity Data</p>
+
+		<div id="chart"></div>
+
+		<script type="text/javascript" src="https://pubnub.github.io/eon/v/eon/1.0.0/eon.js"></script>
+		<link type="text/css" rel="stylesheet" href="https://pubnub.github.io/eon/v/eon/1.0.0/eon.css"/>
+
+		<script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.20.2.js"></script>
+
+		<script>
+
+		var pubnub = new PubNub({
+			publishKey : 'pub-c-cb2e18e3-a8b0-486a-bf82-2d9e9f670b7e',
+			subscribeKey : 'sub-c-a667485c-757f-11e8-9f59-fec9626a7085',
+			});
+
+
+
+			function publish(a){
+				var publishConfig = 
+				{
+					channel : "ch1",
+					message : a
+				};
+
+				pubnub.publish(publishConfig, function(status, response){
+					console.log(status, response);
+				});
+
+			}
+eon.chart({
+			  channels: ['eon-chart'],
+			  history: true,
+			  flow: true,
+			  pubnub: pubnub,
+			  generate: {
+			    bindto: '#chart',
+			    data: {
+			      labels: false
+			    }
+			  }
+			});
+
+
+// 		setInterval(function(){
+//   pubnub.publish({
+//     channel: 'eon-chart',
+//     message: {
+//       eon: {
+//         'Austin': Math.floor(Math.random() * 99),
+//         'New York': Math.floor(Math.random() * 99),
+//         'San Francisco': Math.floor(Math.random() * 99),
+//         'Portland': Math.floor(Math.random() * 99)
+//       }
+//     }
+//   });
+
+// }, 1000);
+
+		pubnub.addListener({
+		    message: function(m) {
+		        // handle message
+		        var channelName = m.channel; // The channel for which the message belongs
+		        var channelGroup = m.subscription; // The channel group or wildcard subscription match (if exists)
+		        var pubTT = m.timetoken; // Publish timetoken
+		        var msg = m.message; // The Payload
+		        var publisher = m.publisher; //The Publisher
+
+		        document.getElementById("sensorData").innerHTML = msg;
+		        console.log(msg)
+		    },
+		    presence: function(p) {
+		        // handle presence
+		        var action = p.action; // Can be join, leave, state-change or timeout
+		        var channelName = p.channel; // The channel for which the message belongs
+		        var occupancy = p.occupancy; // No. of users connected with the channel
+		        var state = p.state; // User State
+		        var channelGroup = p.subscription; //  The channel group or wildcard subscription match (if exists)
+		        var publishTime = p.timestamp; // Publish timetoken
+		        var timetoken = p.timetoken;  // Current timetoken
+		        var uuid = p.uuid; // UUIDs of users who are connected with the channel
+		    },
+		    status: function(s) {
+		        var affectedChannelGroups = s.affectedChannelGroups;
+		        var affectedChannels = s.affectedChannels;
+		        var category = s.category;
+		        var operation = s.operation;
+		    }
+		});
+
+		pubnub.subscribe({
+		    channels: ['ch2'],
+
+		});
+
+		</script>
+
+
+	</body>
+</html>
